@@ -30,9 +30,12 @@ void matrix_scan_user(void) {
 uint16_t get_tapping_term(uint16_t keycode, keyrecord_t* record) {
   switch (keycode) {
     // Increase TAPPING_TERM for home row pinky keys
+    case HOME_S:
+    case HOME_L:
+      return TAPPING_TERM + 25;
     case HOME_A:
     case HOME_SC:
-      return TAPPING_TERM + 50;
+      return TAPPING_TERM + 75;
     default:
       return TAPPING_TERM;
   }

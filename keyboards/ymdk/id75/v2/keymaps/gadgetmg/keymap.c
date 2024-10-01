@@ -29,13 +29,13 @@ void matrix_scan_user(void) {
 
 uint16_t get_tapping_term(uint16_t keycode, keyrecord_t* record) {
   switch (keycode) {
-    // Increase TAPPING_TERM for home row pinky keys
+    // Increase TAPPING_TERM for home row weaker fingers
     case HOME_S:
     case HOME_L:
-      return TAPPING_TERM + 25;
+      return TAPPING_TERM + 50;
     case HOME_A:
     case HOME_SC:
-      return TAPPING_TERM + 75;
+      return TAPPING_TERM + 100;
     default:
       return TAPPING_TERM;
   }
@@ -53,10 +53,6 @@ bool achordion_chord(uint16_t tap_hold_keycode, keyrecord_t* tap_hold_record,
     case SPACEFN:
         return true;
         break;
-    // // Exceptionally allow D + C (Ctrl+C) as a same-hand chord
-    // case HOME_D:
-    //   if (other_keycode == KC_C) { return true; }
-    //   break;
   }
 
   return achordion_opposite_hands(tap_hold_record, other_record);
@@ -82,8 +78,7 @@ bool achordion_eager_mod(uint8_t mod) {
   }
 }
 
-uint16_t achordion_streak_chord_timeout(uint16_t tap_hold_keycode,
-                                        uint16_t next_keycode) {
+uint16_t achordion_streak_chord_timeout(uint16_t tap_hold_keycode, uint16_t next_keycode) {
   if (IS_QK_LAYER_TAP(tap_hold_keycode)) {
     return 0;  // Disable streak detection on layer-tap keys.
   }
@@ -93,22 +88,45 @@ uint16_t achordion_streak_chord_timeout(uint16_t tap_hold_keycode,
   if ((mod & MOD_LSFT) != 0) {
     return 100;  // A shorter streak timeout for Shift mod-tap keys.
   } else {
-    return 300;  // A longer timeout otherwise.
+    return 250;  // A longer timeout otherwise.
   }
+}
+
+bool achordion_streak_continue(uint16_t keycode) {
+  // If mods other than shift or AltGr are held, don't continue the streak.
+  if (get_mods() & (MOD_MASK_CG | MOD_BIT_LALT)) return false;
+  // This function doesn't get called for holds, so convert to tap keycodes.
+  if (IS_QK_MOD_TAP(keycode)) {
+    keycode = QK_MOD_TAP_GET_TAP_KEYCODE(keycode);
+  }
+  if (IS_QK_LAYER_TAP(keycode)) {
+    keycode = QK_LAYER_TAP_GET_TAP_KEYCODE(keycode);
+  }
+  // Regular letters and punctuation continue the streak.
+  if (keycode >= KC_A && keycode <= KC_Z) return true;
+  switch (keycode) {
+    case KC_DOT:
+    case KC_COMMA:
+    case KC_QUOTE:
+    case KC_SEMICOLON:
+    case KC_SPACE:
+      return true;
+  }
+  return false;  // All other keys end the streak.
 }
 
 const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
     /* QWERTY base
      * ┌───┬───┬───┬───┬───┬───┬───┬───┬───┬───┬───┬───┬───┬───┬───┐
-     * │ ` │ 1 │ 2 │ 3 │ 4 │ 5 │Num│   │   │ 6 │ 7 │ 8 │ 9 │ 0 │   │
+     * │ ` │ 1 │ 2 │ 3 │ 4 │ 5 │Num│ / │ * │ 6 │ 7 │ 8 │ 9 │ 0 │ - │
      * ├───┼───┼───┼───┼───┼───┼───┼───┼───┼───┼───┼───┼───┼───┼───┤
-     * │Tab│ Q │ W │ E │ R │ T │ 7 │ 8 │ 9 │ Y │ U │ I │ O │ P │Bsp│
+     * │Esc│ Q │ W │ E │ R │ T │ 7 │ 8 │ 9 │ Y │ U │ I │ O │ P │Bsp│
      * ├───┼───┼───┼───┼───┼───┼───┼───┼───┼───┼───┼───┼───┼───┼───┤
-     * │Esc│ A │ S │ D │ F │ G │ 4 │ 5 │ 6 │ H │ J │ K │ L │ ; │ ' │
+     * │Tab│ A │ S │ D │ F │ G │ 4 │ 5 │ 6 │ H │ J │ K │ L │ ; │ ' │
      * ├───┼───┼───┼───┼───┼───┼───┼───┼───┼───┼───┼───┼───┼───┼───┤
      * │Sft│ Z │ X │ C │ V │ B │ 1 │ 2 │ 3 │ N │ M │ , │ . │ / │Ent│
      * ├───┼───┼───┼───┼───┼───┼───┼───┼───┼───┼───┼───┼───┼───┼───┤
-     * │Ctl│Gui│Alt│Spc│   │   │ 0 │ 0 │ . │   │Spc│Lft│Dwn│Up │Rgt│
+     * │Ctl│Gui│Alt│Spc│   │   │Del│ 0 │ . │   │Spc│Lft│Dwn│Up │Rgt│
      * └───┴───┴───┴───┴───┴───┴───┴───┴───┴───┴───┴───┴───┴───┴───┘
      * Hold modifiers
      * ┌───┬───┬───┬───┬───┬───┬───┬───┬───┬───┬───┬───┬───┬───┬───┐
@@ -124,11 +142,11 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
      * └───┴───┴───┴───┴───┴───┴───┴───┴───┴───┴───┴───┴───┴───┴───┘
      */
     [BASE] = LAYOUT_ortho_5x15(
-        KC_GRV,  KC_1,    KC_2,    KC_3,    KC_4,    KC_5,    KC_NUM,  XXXXXXX, XXXXXXX, KC_6,    KC_7,    KC_8,    KC_9,    KC_0,    XXXXXXX,
-        KC_TAB,  KC_Q,    KC_W,    KC_E,    KC_R,    KC_T,    KC_KP_7, KC_KP_8, KC_KP_9, KC_Y,    KC_U,    KC_I,    KC_O,    KC_P,    KC_BSPC,
-        KC_ESC,  HOME_A,  HOME_S,  HOME_D,  HOME_F,  KC_G,    KC_KP_4, KC_KP_5, KC_KP_6, KC_H,    HOME_J,  HOME_K,  HOME_L,  HOME_SC, KC_QUOT,
-        KC_LSFT, KC_Z,    KC_X,    KC_C,    KC_V,    KC_B,    KC_KP_2, KC_KP_3, KC_PEQL, KC_N,    KC_M,    KC_COMM, KC_DOT,  KC_SLSH, KC_ENT,
-        KC_LCTL, KC_LGUI, KC_LALT, XXXXXXX, SPACEFN, TT(NAV), KC_KP_0, KC_KP_0, KC_PDOT, TT(NAV), SPACEFN, KC_LEFT, KC_DOWN, KC_UP,   KC_RGHT
+        KC_GRV,  KC_1,    KC_2,    KC_3,    KC_4,    KC_5,    KC_NUM,  KC_PSLS, KC_PAST, KC_6,    KC_7,    KC_8,    KC_9,    KC_0,    KC_MINS,
+        KC_ESC,  KC_Q,    KC_W,    KC_E,    KC_R,    KC_T,    KC_KP_7, KC_KP_8, KC_KP_9, KC_Y,    KC_U,    KC_I,    KC_O,    KC_P,    KC_BSPC,
+        KC_TAB,  HOME_A,  HOME_S,  HOME_D,  HOME_F,  KC_G,    KC_KP_4, KC_KP_5, KC_KP_6, KC_H,    HOME_J,  HOME_K,  HOME_L,  HOME_SC, KC_QUOT,
+        KC_LSFT, KC_Z,    KC_X,    KC_C,    KC_V,    KC_B,    KC_KP_1, KC_KP_2, KC_KP_3, KC_N,    KC_M,    KC_COMM, KC_DOT,  KC_SLSH, KC_ENT,
+        KC_LCTL, KC_LGUI, KC_LALT, XXXXXXX, SPACEFN, TT(NAV), KC_DEL,  KC_KP_0, KC_PDOT, TT(NAV), SPACEFN, KC_LEFT, KC_DOWN, KC_UP,   KC_RGHT
     ),
 
     /* Symbol layer
